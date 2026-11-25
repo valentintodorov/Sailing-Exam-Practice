@@ -1,0 +1,704 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exam Trainer</title>
+<style>
+:root{
+  --bg:#f6f7f9;--card:#fff;--text:#1d2330;--muted:#667085;--line:#e3e6ec;
+  --accent:#3b5bdb;--accent-text:#fff;--good:#2f9e44;--good-bg:#e6f6ea;
+  --bad:#e03131;--bad-bg:#fdeaea;--unseen:#ced4da;--warn:#f08c00;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#14171d;--card:#1d222b;--text:#e8ebf1;--muted:#98a2b3;--line:#2d3440;
+  --accent:#6c8cff;--accent-text:#0e1220;--good:#51cf66;--good-bg:#1c3324;
+  --bad:#ff6b6b;--bad-bg:#3a1f22;--unseen:#454d5a;--warn:#ffa94d}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:860px;margin:0 auto;padding:16px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+h1{font-size:22px;margin:0}
+h2{font-size:18px;margin:0 0 10px}
+h3{font-size:15px;margin:14px 0 6px}
+nav{display:flex;gap:6px}
+nav button{background:transparent;border:1px solid var(--line);color:var(--text);padding:6px 12px;border-radius:8px;cursor:pointer;font:inherit}
+nav button.active{background:var(--accent);color:var(--accent-text);border-color:var(--accent)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.stat b{display:block;font-size:24px}
+.stat span{color:var(--muted);font-size:13px}
+button.btn{background:var(--accent);color:var(--accent-text);border:0;padding:10px 16px;border-radius:10px;font:inherit;font-weight:600;cursor:pointer}
+button.btn.secondary{background:transparent;color:var(--text);border:1px solid var(--line)}
+button.btn.danger{background:var(--bad);color:#fff}
+button.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+label.chk{display:flex;gap:8px;align-items:center;padding:4px 0;cursor:pointer}
+input[type=number]{width:90px;padding:6px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text);font:inherit}
+textarea{width:100%;min-height:130px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text);padding:8px;font:13px/1.4 ui-monospace,Menlo,Consolas,monospace}
+.bar{display:flex;height:10px;border-radius:6px;overflow:hidden;background:var(--unseen)}
+.bar i{display:block;height:100%}
+.bar .g{background:var(--good)}.bar .r{background:var(--bad)}
+.cat-row{padding:10px 0;border-top:1px solid var(--line)}
+.cat-row:first-child{border-top:0}
+.cat-head{display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;flex-wrap:wrap}
+.progress{height:8px;background:var(--line);border-radius:6px;overflow:hidden;margin:6px 0 14px}
+.progress i{display:block;height:100%;background:var(--accent)}
+.qtext{font-size:18px;font-weight:600;margin:8px 0 14px;white-space:pre-wrap}
+.opt{display:flex;gap:10px;width:100%;text-align:left;background:var(--card);color:var(--text);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;font:inherit;cursor:pointer}
+.opt:hover:not([disabled]){border-color:var(--accent)}
+.opt .k{font-weight:700;color:var(--muted);min-width:20px}
+.opt.sel{border-color:var(--accent)}
+.opt.good{border-color:var(--good);background:var(--good-bg)}
+.opt.bad{border-color:var(--bad);background:var(--bad-bg)}
+.opt[disabled]{cursor:default}
+.explain{border-left:4px solid var(--accent);padding:8px 12px;background:var(--bg);border-radius:6px;margin:10px 0;white-space:pre-wrap}
+.badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;border:1px solid var(--line);color:var(--muted)}
+.ok{color:var(--good)}.ko{color:var(--bad)}
+details{border-top:1px solid var(--line);padding:8px 0}
+summary{cursor:pointer}
+.hidden{display:none}
+.qimg{display:block;max-width:100%;max-height:340px;object-fit:contain;background:#fff;border-radius:8px;border:1px solid var(--line);margin:0 0 14px}
+.oimg{display:block;max-width:100%;max-height:150px;object-fit:contain;background:#fff;border-radius:6px;margin-top:6px}
+.banner{border:1px solid var(--warn);background:var(--card);border-radius:12px;padding:12px;margin-bottom:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>📝 Exam Trainer</h1>
+    <nav id="nav"></nav>
+  </header>
+  <main id="app"></main>
+</div>
+
+<script>
+/* ============================================================
+   LOGIC (pure, testable)
+   ============================================================ */
+const Logic = (() => {
+  const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+  function hash(str){
+    let h = 5381;
+    for (let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0;
+    return h.toString(36);
+  }
+
+  function parseCSV(text){
+    text = text.replace(/^﻿/, '');
+    const firstLine = text.split(/\r?\n/, 1)[0] || '';
+    const counts = {',': 0, ';': 0, '\t': 0};
+    let inQ = false;
+    for (const ch of firstLine){ if (ch === '"') inQ = !inQ; else if (!inQ && ch in counts) counts[ch]++; }
+    const delim = Object.keys(counts).sort((a,b)=>counts[b]-counts[a])[0];
+    const rows = []; let row = [], cur = '', q = false;
+    for (let i = 0; i < text.length; i++){
+      const c = text[i];
+      if (q){
+        if (c === '"'){ if (text[i+1] === '"'){ cur += '"'; i++; } else q = false; }
+        else cur += c;
+      } else if (c === '"') q = true;
+      else if (c === delim){ row.push(cur); cur = ''; }
+      else if (c === '\n' || c === '\r'){
+        if (c === '\r' && text[i+1] === '\n') i++;
+        row.push(cur); cur = '';
+        if (row.some(x => x.trim() !== '')) rows.push(row);
+        row = [];
+      } else cur += c;
+    }
+    row.push(cur);
+    if (row.some(x => x.trim() !== '')) rows.push(row);
+    return rows;
+  }
+
+  // "B", 2, "2", "A|C", "A,C", ["A","C"] -> 0-based sorted unique indexes
+  function parseAnswer(v, nOpts){
+    let parts;
+    if (Array.isArray(v)) parts = v;
+    else if (typeof v === 'number') parts = [v];
+    else parts = String(v ?? '').split(/[|,;\s]+/).filter(Boolean);
+    const out = [];
+    for (const p of parts){
+      let idx;
+      if (typeof p === 'number' || /^\d+$/.test(String(p).trim())) idx = parseInt(p, 10) - 1;
+      else { const s = String(p).trim().toUpperCase(); idx = s.length === 1 ? LETTERS.indexOf(s) : -1; }
+      if (!(idx >= 0 && idx < nOpts)) return null;
+      if (!out.includes(idx)) out.push(idx);
+    }
+    return out.length ? out.sort((a,b)=>a-b) : null;
+  }
+
+  function normalize(raw, n){
+    const question = String(raw.question ?? raw.text ?? raw.q ?? '').trim();
+    const category = String(raw.category ?? raw.topic ?? '').trim() || 'General';
+    let options = raw.options ?? raw.answers ?? raw.choices;
+    // CSV convenience: a single "options" cell with options separated by |
+    if (typeof options === 'string') options = options.split('|');
+    if (!Array.isArray(options)){
+      options = [];
+      for (let i = 1; i <= 12; i++){
+        const v = raw['option' + i] ?? raw['option_' + i] ?? raw['opt' + i];
+        if (v !== undefined && String(v).trim() !== '') options.push(v);
+      }
+    }
+    options = options.map(o => String(o).trim()).filter(o => o !== '');
+    if (!question) return {error: `#${n}: missing question text`};
+    if (options.length < 2) return {error: `#${n}: needs at least 2 options`};
+    const answer = parseAnswer(raw.answer ?? raw.correct ?? raw.solution, options.length);
+    if (!answer) return {error: `#${n}: missing/invalid answer`};
+    const explanation = String(raw.explanation ?? raw.note ?? '').trim();
+    const id = String(raw.id ?? '').trim() || 'q' + hash(category + '|' + question);
+    const q = {id, category, question, options, answer, explanation};
+    if (raw.image) q.image = String(raw.image);
+    if (Array.isArray(raw.option_images) && raw.option_images.some(Boolean)) q.optionImages = raw.option_images.map(x => x ? String(x) : '');
+    if (raw.number !== undefined && raw.number !== '') q.number = raw.number;
+    return {q};
+  }
+
+  function parseQuestions(text){
+    text = String(text || '').trim();
+    const errors = []; const list = [];
+    if (!text) return {questions: [], errors: ['Nothing to import']};
+    let raws;
+    if (text[0] === '[' || text[0] === '{'){
+      let data;
+      try { data = JSON.parse(text); } catch (e){ return {questions: [], errors: ['Invalid JSON: ' + e.message]}; }
+      raws = Array.isArray(data) ? data : (data.questions || []);
+    } else {
+      const rows = parseCSV(text);
+      const head = rows.shift().map(h => h.trim().toLowerCase());
+      raws = rows.map(r => { const o = {}; head.forEach((h, i) => { if (h) o[h] = r[i]; }); return o; });
+    }
+    const seen = new Set();
+    raws.forEach((r, i) => {
+      const res = normalize(r, i + 1);
+      if (res.error) errors.push(res.error);
+      else if (seen.has(res.q.id)) errors.push(`#${i+1}: duplicate question skipped`);
+      else { seen.add(res.q.id); list.push(res.q); }
+    });
+    return {questions: list, errors};
+  }
+
+  function mergeQuestions(state, list){
+    let added = 0, updated = 0;
+    for (const q of list){
+      if (state.questions[q.id]){ state.questions[q.id] = q; updated++; }
+      else { state.questions[q.id] = q; added++; }
+    }
+    return {added, updated};
+  }
+
+  function shuffle(arr, rnd = Math.random){
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  }
+
+  const isWrong = (state, id) => state.progress[id] && state.progress[id].last === false;
+  const isNew = (state, id) => !state.progress[id] || !state.progress[id].attempts;
+
+  function categories(state){
+    const m = {};
+    for (const q of Object.values(state.questions)) m[q.category] = (m[q.category] || 0) + 1;
+    return Object.keys(m).sort((a,b)=>a.localeCompare(b)).map(name => ({name, count: m[name]}));
+  }
+
+  function buildSession(state, opts){
+    const {cats = null, mode = 'all', limit = 0, shuffleQ = true, shuffleO = true, ids = null, title = ''} = opts;
+    let pool = ids ? ids.filter(id => state.questions[id])
+      : Object.values(state.questions).filter(q => !cats || cats.includes(q.category)).map(q => q.id);
+    if (!ids){
+      if (mode === 'wrong') pool = pool.filter(id => isWrong(state, id));
+      else if (mode === 'new') pool = pool.filter(id => isNew(state, id));
+    }
+    if (shuffleQ) pool = shuffle(pool);
+    if (limit > 0) pool = pool.slice(0, limit);
+    const perm = {};
+    for (const id of pool){
+      const idx = state.questions[id].options.map((_, i) => i);
+      perm[id] = shuffleO ? shuffle(idx) : idx;
+    }
+    return {title, ids: pool, idx: 0, perm, answers: {}, pending: [], skipped: {}, finished: false, startedAt: Date.now()};
+  }
+
+  // options that look identical (same text and image) are interchangeable, so a duplicate of the keyed answer also counts
+  const optKey = (q, i) => q.options[i] + '\u0000' + ((q.optionImages && q.optionImages[i]) || '');
+  const isAnswerOpt = (q, i) => q.answer.includes(i) || q.answer.some(a => optKey(q, a) === optKey(q, i));
+  function isCorrectSel(q, sel){
+    const want = q.answer.map(a => optKey(q, a)).sort(), got = sel.map(i => optKey(q, i)).sort();
+    return want.length === got.length && want.every((k, i) => k === got[i]);
+  }
+
+  function sameSet(a, b){ return a.length === b.length && a.every(x => b.includes(x)); }
+
+  function recordAnswer(state, id, selected){
+    const q = state.questions[id];
+    const correct = isCorrectSel(q, selected);
+    const p = state.progress[id] || (state.progress[id] = {attempts: 0, correct: 0, last: null, streak: 0, lastAt: 0});
+    p.attempts++; if (correct) p.correct++;
+    p.last = correct; p.streak = correct ? p.streak + 1 : 0; p.lastAt = Date.now();
+    return correct;
+  }
+
+  function stats(state){
+    const per = {};
+    let total = 0, seen = 0, ok = 0, wrong = 0, attempts = 0, corrects = 0;
+    for (const q of Object.values(state.questions)){
+      const c = per[q.category] || (per[q.category] = {name: q.category, total: 0, seen: 0, ok: 0, wrong: 0, attempts: 0, corrects: 0});
+      const p = state.progress[q.id];
+      c.total++; total++;
+      if (p && p.attempts){
+        c.seen++; seen++; c.attempts += p.attempts; c.corrects += p.correct; attempts += p.attempts; corrects += p.correct;
+        if (p.last){ c.ok++; ok++; } else { c.wrong++; wrong++; }
+      }
+    }
+    return {total, seen, ok, wrong, unseen: total - seen, attempts, corrects,
+      categories: Object.values(per).sort((a,b)=>a.name.localeCompare(b.name))};
+  }
+
+  function sessionResult(state, s){
+    const answered = s.ids.filter(id => s.answers[id]);
+    const wrongIds = answered.filter(id => !s.answers[id].correct);
+    const byCat = {};
+    for (const id of answered){
+      const c = state.questions[id].category;
+      const e = byCat[c] || (byCat[c] = {name: c, total: 0, correct: 0});
+      e.total++; if (s.answers[id].correct) e.correct++;
+    }
+    const skippedIds = s.ids.filter(id => !s.answers[id] && s.skipped && s.skipped[id]);
+    return {answered: answered.length, correct: answered.length - wrongIds.length, wrongIds, skippedIds,
+      byCat: Object.values(byCat).sort((a,b)=>a.name.localeCompare(b.name))};
+  }
+
+  return {parseCSV, parseAnswer, parseQuestions, mergeQuestions, buildSession, recordAnswer, stats,
+    sessionResult, categories, isWrong, isNew, shuffle, hash, sameSet, isCorrectSel, isAnswerOpt, LETTERS};
+})();
+
+/* ============================================================
+   STORAGE
+   ============================================================ */
+const KEY = 'examTrainer.v1';
+const QKEY = 'examTrainer.questions.v1';
+let qDirty = false; // questions are large (images) - only rewritten when they change
+const Store = {
+  mem: null,
+  load(){
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw){
+        const st = JSON.parse(raw);
+        if (!st.questions){ const q = localStorage.getItem(QKEY); st.questions = q ? JSON.parse(q) : {}; }
+        else qDirty = true; // old single-key format: migrate on next save
+        return st;
+      }
+    } catch (e) {}
+    return this.mem;
+  },
+  save(state){
+    this.mem = state;
+    try {
+      if (qDirty){ localStorage.setItem(QKEY, JSON.stringify(state.questions)); qDirty = false; }
+      const {questions, ...rest} = state;
+      localStorage.setItem(KEY, JSON.stringify(rest));
+      this.ok = true;
+    } catch (e) { this.ok = false; }
+    return this.ok;
+  },
+  ok: true
+};
+
+/* ============================================================
+   APP / UI
+   ============================================================ */
+let state = Store.load() || {questions: {}, progress: {}, session: null,
+  settings: {mode: 'all', limit: 0, shuffleQ: true, shuffleO: true, cats: null}};
+state.questions = state.questions || {};
+state.progress = state.progress || {};
+state.settings = Object.assign({mode: 'all', limit: 0, shuffleQ: true, shuffleO: true, cats: null}, state.settings || {});
+// drop a saved session that refers to questions that no longer exist
+if (state.session && state.session.ids.some(id => !state.questions[id])) state.session = null;
+let tab = 'practice';
+let importMsg = null;
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const imgTag = (src, cls) => src ? `<img class="${cls}" src="${esc(src)}" alt="">` : '';
+const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+const save = () => Store.save(state);
+
+function renderNav(){
+  const inSession = state.session && !state.session.finished && view === 'quiz';
+  const items = [['practice', 'Practice'], ['progress', 'Progress'], ['questions', 'Questions']];
+  $('#nav').innerHTML = items.map(([k, l]) =>
+    `<button data-action="tab" data-tab="${k}" class="${view === 'home' && tab === k ? 'active' : ''}">${l}</button>`).join('');
+  $('#nav').classList.toggle('hidden', inSession);
+}
+
+let view = 'home'; // home | quiz | results
+
+function render(){
+  renderNav();
+  const app = $('#app');
+  if (view === 'quiz' && state.session && !state.session.finished) app.innerHTML = quizHTML();
+  else if (view === 'results' && state.session) app.innerHTML = resultsHTML();
+  else { view = 'home'; renderNav(); app.innerHTML = tab === 'practice' ? practiceHTML() : tab === 'progress' ? progressHTML() : questionsHTML(); }
+}
+
+function summaryCards(st){
+  return `<div class="grid" style="margin-bottom:14px">
+    <div class="stat"><b id="st-total">${st.total}</b><span>questions</span></div>
+    <div class="stat"><b id="st-seen">${pct(st.seen, st.total)}%</b><span>seen (${st.seen}/${st.total})</span></div>
+    <div class="stat"><b id="st-mastered">${st.ok}</b><span>last answer correct</span></div>
+    <div class="stat"><b id="st-wrong" class="${st.wrong ? 'ko' : ''}">${st.wrong}</b><span>wrong answers to review</span></div>
+    <div class="stat"><b id="st-acc">${pct(st.corrects, st.attempts)}%</b><span>overall accuracy</span></div>
+  </div>`;
+}
+
+function practiceHTML(){
+  const st = Logic.stats(state);
+  if (!st.total) return `<div class="card"><h2>Welcome</h2>
+    <p>No questions yet. Go to <b>Questions</b> and import your list (JSON or CSV).</p>
+    <button class="btn" data-action="tab" data-tab="questions">Import questions</button></div>`;
+  const cats = Logic.categories(state);
+  // saved selection applies only to categories that existed when it was saved; new categories default to checked
+  const known = state.settings.knownCats, saved = state.settings.cats;
+  const sel = (!saved || !known) ? cats.map(c => c.name)
+    : cats.filter(c => !known.includes(c.name) || saved.includes(c.name)).map(c => c.name);
+  const s = state.session;
+  let resume = '';
+  if (s && !s.finished){
+    resume = `<div class="banner" id="resume-banner"><b>Session in progress</b> – ${esc(s.title || 'Practice')}, question ${Math.min(s.idx + 1, s.ids.length)} of ${s.ids.length}.
+      <div class="row" style="margin-top:8px"><button class="btn" data-action="resume">Resume</button>
+      <button class="btn secondary" data-action="abandon">Discard</button></div></div>`;
+  }
+  return `${resume}${summaryCards(st)}
+  <div class="card">
+    <h2>Start a test</h2>
+    <h3>Categories <button class="btn secondary" style="padding:2px 8px;font-size:12px" data-action="cats-all">all</button>
+      <button class="btn secondary" style="padding:2px 8px;font-size:12px" data-action="cats-none">none</button></h3>
+    ${cats.map(c => {
+      const cs = st.categories.find(x => x.name === c.name);
+      return `<label class="chk"><input type="checkbox" class="catbox" value="${esc(c.name)}" ${sel.includes(c.name) ? 'checked' : ''}>
+        <span>${esc(c.name)} <span class="muted small">(${c.count} · ${cs.wrong} wrong · ${cs.total - cs.seen} new)</span></span></label>`;
+    }).join('')}
+    <h3>Which questions</h3>
+    <label class="chk"><input type="radio" name="mode" value="all" ${state.settings.mode === 'all' ? 'checked' : ''}> All questions</label>
+    <label class="chk"><input type="radio" name="mode" value="new" ${state.settings.mode === 'new' ? 'checked' : ''}> Only not yet answered</label>
+    <label class="chk"><input type="radio" name="mode" value="wrong" ${state.settings.mode === 'wrong' ? 'checked' : ''}> Only wrong answers</label>
+    <h3>Options</h3>
+    <div class="row">
+      <label>Limit <input type="number" id="limit" min="0" value="${state.settings.limit || 0}"> <span class="muted small">(0 = no limit)</span></label>
+    </div>
+    <label class="chk"><input type="checkbox" id="shuffleQ" ${state.settings.shuffleQ ? 'checked' : ''}> Shuffle questions</label>
+    <label class="chk"><input type="checkbox" id="shuffleO" ${state.settings.shuffleO ? 'checked' : ''}> Shuffle answer options</label>
+    <div class="row" style="margin-top:12px">
+      <button class="btn" id="start-btn" data-action="start">Start test</button>
+      <button class="btn secondary" id="retest-wrong-btn" data-action="start-wrong" ${st.wrong ? '' : 'disabled'}>Retest all wrong answers (${st.wrong})</button>
+    </div>
+    <div id="setup-msg" class="small ko" style="margin-top:8px"></div>
+  </div>`;
+}
+
+function progressHTML(){
+  const st = Logic.stats(state);
+  if (!st.total) return `<div class="card">No questions yet.</div>`;
+  return `${summaryCards(st)}
+  <div class="card"><h2>By category</h2>
+  ${st.categories.map(c => `<div class="cat-row" data-cat="${esc(c.name)}">
+    <div class="cat-head"><b>${esc(c.name)}</b>
+      <span class="muted small">${c.seen}/${c.total} seen · <span class="ok">${c.ok} ok</span> · <span class="ko">${c.wrong} wrong</span> · accuracy ${pct(c.corrects, c.attempts)}%</span></div>
+    <div class="bar" title="green: last answer correct, red: wrong, grey: not answered">
+      <i class="g" style="width:${pct(c.ok, c.total)}%"></i><i class="r" style="width:${pct(c.wrong, c.total)}%"></i></div>
+    <div class="row" style="margin-top:6px">
+      <button class="btn secondary small" data-action="start-cat" data-cat="${esc(c.name)}">Test this category</button>
+      <button class="btn secondary small" data-action="start-cat-wrong" data-cat="${esc(c.name)}" ${c.wrong ? '' : 'disabled'}>Retest wrong (${c.wrong})</button>
+    </div></div>`).join('')}
+  </div>
+  <div class="card"><h2>Backup</h2>
+    <p class="muted small">Progress is stored in this browser. Export a backup file now and then; you can import it on another device.</p>
+    <div class="row"><button class="btn secondary" data-action="export">Export backup</button>
+    <button class="btn secondary" data-action="import-backup-btn">Import backup</button>
+    <input type="file" id="backup-file" accept=".json,application/json" class="hidden">
+    <button class="btn danger" data-action="reset-progress">Reset progress</button></div>
+    ${Store.ok ? '' : '<p class="ko small">Browser storage is unavailable: progress will be lost when you close this page. Use Export backup.</p>'}
+  </div>`;
+}
+
+function questionsHTML(){
+  const cats = Logic.categories(state);
+  return `<div class="card"><h2>Import questions</h2>
+    <p class="small muted">Paste JSON or CSV, or choose a file. Re-importing the same questions keeps your progress. Answer = letter (B) or 1-based number; several answers: <code>A|C</code>. CSV: columns <code>category, question, option1…optionN, answer, explanation</code> (or one <code>options</code> column separated by <code>|</code>).</p>
+    <textarea id="import-text" placeholder='[{"category":"Networking","question":"...","options":["a","b","c","d"],"answer":"B","explanation":"..."}]'></textarea>
+    <div class="row" style="margin-top:8px">
+      <button class="btn" data-action="import-text">Import</button>
+      <button class="btn secondary" data-action="pick-file">Choose file…</button>
+      <input type="file" id="q-file" accept=".json,.csv,.txt,text/csv,application/json" class="hidden">
+      <button class="btn secondary" data-action="template">Download template</button>
+    </div>
+    <div id="import-msg" class="small" style="margin-top:8px">${importMsg ? importMsg : ''}</div>
+  </div>
+  <div class="card"><h2>Library (${Object.keys(state.questions).length} questions)</h2>
+    ${cats.length ? cats.map(c => `<div class="cat-head"><span>${esc(c.name)}</span><span class="muted">${c.count}</span></div>`).join('') : '<span class="muted">Empty</span>'}
+    ${cats.length ? `<div class="row" style="margin-top:10px"><button class="btn danger" data-action="clear-questions">Delete all questions and progress</button></div>` : ''}
+  </div>`;
+}
+
+function quizHTML(){
+  const s = state.session;
+  const id = s.ids[s.idx];
+  const q = state.questions[id];
+  const ans = s.answers[id];
+  const multi = q.answer.length > 1;
+  const order = s.perm[id];
+  const picked = ans ? ans.sel : s.pending;
+  const opts = order.map((o, pos) => {
+    let cls = 'opt';
+    if (ans){
+      if (Logic.isAnswerOpt(q, o)) cls += ' good';
+      else if (picked.includes(o)) cls += ' bad';
+    } else if (picked.includes(o)) cls += ' sel';
+    return `<button class="${cls}" data-action="opt" data-o="${o}" ${ans ? 'disabled' : ''}>
+      <span class="k">${pos + 1}.</span><span>${esc(q.options[o])}${imgTag(q.optionImages && q.optionImages[o], 'oimg')}</span></button>`;
+  }).join('');
+  const done = Object.keys(s.answers).length;
+  return `<div class="card">
+    <div class="row" style="justify-content:space-between">
+      <span class="badge">${esc(q.category)}${q.number ? ' · №' + esc(q.number) : ''}</span>
+      <span class="muted small">Question ${s.idx + 1} / ${s.ids.length}</span></div>
+    <div class="progress"><i style="width:${pct(done, s.ids.length)}%"></i></div>
+    <div class="qtext" id="qtext">${esc(q.question)}</div>
+    ${imgTag(q.image, 'qimg')}
+    ${multi ? '<div class="small muted" style="margin-bottom:8px">Select all correct answers.</div>' : ''}
+    <div id="options">${opts}</div>
+    ${!ans ? `<div class="row">${multi ? `<button class="btn" id="check-btn" data-action="check" ${s.pending.length ? '' : 'disabled'}>Check answer</button>` : ''}
+      <button class="btn secondary" id="skip-btn" data-action="skip" title="Go to the next question without answering (key: S)">Skip ⏭</button>
+      <button class="btn secondary" id="reveal-btn" data-action="reveal" title="Show the correct answer. Counts as wrong so you can retest it (key: V)">Show answer 👁</button></div>` : ''}
+    ${ans ? `<div id="feedback" class="${ans.correct ? 'ok' : 'ko'}"><b>${ans.revealed ? '👁 Answer shown – counted as wrong' : ans.correct ? '✓ Correct' : '✗ Wrong'}</b></div>
+      ${q.explanation ? `<div class="explain">${esc(q.explanation)}</div>` : ''}
+      <div class="row" style="margin-top:10px"><button class="btn" id="next-btn" data-action="next">${s.idx + 1 >= s.ids.length ? 'Finish' : 'Next'}</button></div>` : ''}
+    <div class="row" style="margin-top:16px"><button class="btn secondary small" data-action="end-early">End test now</button>
+      <span class="muted small">Progress is saved after every answer.</span></div>
+  </div>`;
+}
+
+function resultsHTML(){
+  const s = state.session;
+  const r = Logic.sessionResult(state, s);
+  const wrongHTML = r.wrongIds.map(id => {
+    const q = state.questions[id], a = s.answers[id];
+    return `<details><summary>${esc(q.question)}</summary>
+      <div class="small" style="margin-top:6px">${imgTag(q.image, 'qimg')}
+        <div><span class="ko">Your answer:</span> ${a.revealed ? '<i>answer was shown</i>' : a.sel.map(o => esc(q.options[o]) + imgTag(q.optionImages && q.optionImages[o], 'oimg')).join(' | ')}</div>
+        <div><span class="ok">Correct:</span> ${q.answer.map(o => esc(q.options[o]) + imgTag(q.optionImages && q.optionImages[o], 'oimg')).join(' | ')}</div>
+        ${q.explanation ? `<div class="explain">${esc(q.explanation)}</div>` : ''}</div></details>`;
+  }).join('');
+  return `<div class="card"><h2>Results</h2>
+    <div class="grid">
+      <div class="stat"><b id="res-score">${pct(r.correct, r.answered)}%</b><span>score</span></div>
+      <div class="stat"><b id="res-correct">${r.correct}</b><span>correct</span></div>
+      <div class="stat"><b id="res-wrong" class="${r.wrongIds.length ? 'ko' : ''}">${r.wrongIds.length}</b><span>wrong</span></div>
+      <div class="stat"><b id="res-answered">${r.answered}/${s.ids.length}</b><span>answered</span></div>
+      ${r.skippedIds.length ? `<div class="stat"><b id="res-skipped">${r.skippedIds.length}</b><span>skipped</span></div>` : ''}
+    </div>
+    <h3>By category</h3>
+    ${r.byCat.map(c => `<div class="cat-head"><span>${esc(c.name)}</span><span class="muted">${c.correct}/${c.total} (${pct(c.correct, c.total)}%)</span></div>`).join('')}
+    <div class="row" style="margin:14px 0">
+      <button class="btn" id="retest-btn" data-action="retest" ${r.wrongIds.length ? '' : 'disabled'}>Retest wrong answers (${r.wrongIds.length})</button>
+      ${r.skippedIds.length ? `<button class="btn secondary" id="retest-skipped-btn" data-action="retest-skipped">Practice skipped (${r.skippedIds.length})</button>` : ''}
+      <button class="btn secondary" data-action="home">Back to start</button></div>
+    ${r.wrongIds.length ? `<h3>Wrong answers</h3><div id="wrong-list">${wrongHTML}</div>` : '<p class="ok"><b>Perfect – nothing to review 🎉</b></p>'}
+  </div>`;
+}
+
+/* ---------- actions ---------- */
+function readSetup(){
+  const boxes = [...document.querySelectorAll('.catbox')];
+  if (boxes.length){
+    state.settings.cats = boxes.filter(b => b.checked).map(b => b.value);
+    state.settings.knownCats = boxes.map(b => b.value);
+    const m = document.querySelector('input[name=mode]:checked');
+    if (m) state.settings.mode = m.value;
+    state.settings.limit = Math.max(0, parseInt($('#limit').value, 10) || 0);
+    state.settings.shuffleQ = $('#shuffleQ').checked;
+    state.settings.shuffleO = $('#shuffleO').checked;
+    save();
+  }
+}
+
+function beginSession(opts){
+  const s = Logic.buildSession(state, opts);
+  if (!s.ids.length) return false;
+  state.session = s; view = 'quiz'; save(); render(); return true;
+}
+
+function answerQuestion(sel){
+  const s = state.session, id = s.ids[s.idx];
+  if (s.answers[id]) return;
+  const correct = Logic.recordAnswer(state, id, sel);
+  s.answers[id] = {sel: sel.slice().sort((a,b)=>a-b), correct};
+  s.pending = []; save(); render();
+}
+
+function revealAnswer(){
+  const s = state.session, id = s.ids[s.idx];
+  if (s.answers[id]) return;
+  Logic.recordAnswer(state, id, []); // nothing selected -> counted as wrong
+  s.answers[id] = {sel: [], correct: false, revealed: true};
+  s.pending = []; save(); render();
+}
+
+function skipQuestion(){
+  const s = state.session, id = s.ids[s.idx];
+  if (s.answers[id]) return;
+  (s.skipped || (s.skipped = {}))[id] = true;
+  nextQuestion();
+}
+
+function nextQuestion(){
+  const s = state.session;
+  if (s.idx + 1 >= s.ids.length) return finishSession();
+  s.idx++; s.pending = []; save(); render();
+}
+
+function finishSession(){ state.session.finished = true; view = 'results'; save(); render(); }
+
+function download(name, text, type){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], {type: type || 'application/json'}));
+  a.download = name; document.body.appendChild(a); a.click(); a.remove();
+}
+
+function doImport(text){
+  const {questions, errors} = Logic.parseQuestions(text);
+  let msg = '';
+  if (questions.length){
+    const r = Logic.mergeQuestions(state, questions);
+    qDirty = true;
+    if (!save()) msg += '<div class="ko">Browser storage is full or unavailable: questions work for now but will be lost on reload.</div>';
+    msg += `<span class="ok">Imported ${questions.length} questions (${r.added} new, ${r.updated} updated).</span>`;
+  }
+  if (errors.length){
+    msg += `<div class="ko">${errors.length} problem(s):<br>${errors.slice(0, 8).map(esc).join('<br>')}${errors.length > 8 ? '<br>…' : ''}</div>`;
+  }
+  importMsg = msg || '<span class="ko">Nothing imported</span>';
+  render();
+}
+
+const TEMPLATE = JSON.stringify([
+  {category: 'Example category', question: 'What is 2 + 2?', options: ['3', '4', '5', '22'], answer: 'B', explanation: 'Basic arithmetic.'},
+  {category: 'Example category', question: 'Select the prime numbers.', options: ['2', '4', '5', '9'], answer: ['A', 'C']}
+], null, 2);
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-action]');
+  if (!el || el.disabled) return;
+  const a = el.dataset.action;
+  switch (a){
+    case 'tab': view = 'home'; tab = el.dataset.tab; importMsg = null; render(); break;
+    case 'cats-all': document.querySelectorAll('.catbox').forEach(b => b.checked = true); break;
+    case 'cats-none': document.querySelectorAll('.catbox').forEach(b => b.checked = false); break;
+    case 'start': {
+      readSetup();
+      if (!state.settings.cats.length){ $('#setup-msg').textContent = 'Select at least one category.'; break; }
+      const ok = beginSession({cats: state.settings.cats, mode: state.settings.mode, limit: state.settings.limit,
+        shuffleQ: state.settings.shuffleQ, shuffleO: state.settings.shuffleO,
+        title: state.settings.cats.length === Logic.categories(state).length ? 'All categories' : state.settings.cats.join(', ')});
+      if (!ok) $('#setup-msg').textContent = 'No questions match these settings.';
+      break;
+    }
+    case 'start-wrong': {
+      readSetup();
+      const ids = Object.keys(state.questions).filter(id => Logic.isWrong(state, id));
+      beginSession({ids, shuffleQ: state.settings.shuffleQ, shuffleO: state.settings.shuffleO, title: 'Wrong answers'});
+      break;
+    }
+    case 'start-cat':
+      beginSession({cats: [el.dataset.cat], mode: 'all', shuffleQ: state.settings.shuffleQ, shuffleO: state.settings.shuffleO, title: el.dataset.cat}); break;
+    case 'start-cat-wrong':
+      beginSession({cats: [el.dataset.cat], mode: 'wrong', shuffleQ: state.settings.shuffleQ, shuffleO: state.settings.shuffleO, title: el.dataset.cat + ' (wrong)'}); break;
+    case 'resume': view = 'quiz'; render(); break;
+    case 'abandon': state.session = null; save(); render(); break;
+    case 'opt': {
+      const o = parseInt(el.dataset.o, 10), s = state.session, q = state.questions[s.ids[s.idx]];
+      if (q.answer.length > 1){
+        const i = s.pending.indexOf(o); if (i >= 0) s.pending.splice(i, 1); else s.pending.push(o);
+        render();
+      } else answerQuestion([o]);
+      break;
+    }
+    case 'check': if (state.session.pending.length) answerQuestion(state.session.pending); break;
+    case 'next': nextQuestion(); break;
+    case 'skip': skipQuestion(); break;
+    case 'reveal': revealAnswer(); break;
+    case 'retest-skipped': {
+      const r = Logic.sessionResult(state, state.session);
+      beginSession({ids: r.skippedIds, shuffleQ: state.settings.shuffleQ, shuffleO: state.settings.shuffleO, title: 'Skipped questions'});
+      break;
+    }
+    case 'end-early':
+      if (Object.keys(state.session.answers).length === 0 && !Object.keys(state.session.skipped || {}).length){ state.session = null; view = 'home'; save(); render(); }
+      else finishSession();
+      break;
+    case 'retest': {
+      const r = Logic.sessionResult(state, state.session);
+      beginSession({ids: r.wrongIds, shuffleQ: state.settings.shuffleQ, shuffleO: state.settings.shuffleO, title: 'Retest of wrong answers'});
+      break;
+    }
+    case 'home': state.session = null; view = 'home'; tab = 'practice'; save(); render(); break;
+    case 'import-text': doImport($('#import-text').value); break;
+    case 'pick-file': $('#q-file').click(); break;
+    case 'template': download('questions-template.json', TEMPLATE); break;
+    case 'clear-questions':
+      if (confirm('Delete ALL questions and progress?')){ state.questions = {}; state.progress = {}; state.session = null; qDirty = true; save(); importMsg = null; render(); }
+      break;
+    case 'reset-progress':
+      if (confirm('Reset all progress? Questions are kept.')){ state.progress = {}; state.session = null; save(); render(); }
+      break;
+    case 'export':
+      download('exam-trainer-backup.json', JSON.stringify({version: 1, questions: state.questions, progress: state.progress, settings: state.settings})); break;
+    case 'import-backup-btn': $('#backup-file').click(); break;
+  }
+});
+
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.id === 'q-file' && t.files[0]) t.files[0].text().then(doImport);
+  if (t.id === 'backup-file' && t.files[0]) t.files[0].text().then(txt => {
+    try {
+      const d = JSON.parse(txt);
+      if (!d.questions || !d.progress) throw new Error('not a backup file');
+      state.questions = d.questions; state.progress = d.progress; qDirty = true;
+      if (d.settings) state.settings = Object.assign(state.settings, d.settings);
+      state.session = null; save(); render();
+    } catch (err){ alert('Invalid backup: ' + err.message); }
+  });
+});
+
+document.addEventListener('keydown', e => {
+  if (view !== 'quiz' || !state.session || state.session.finished) return;
+  if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+  const s = state.session, id = s.ids[s.idx], q = state.questions[id];
+  if (e.key === 'Enter'){
+    if (s.answers[id]) nextQuestion();
+    else if (q.answer.length > 1 && s.pending.length) answerQuestion(s.pending);
+  } else if (!s.answers[id] && (e.key === 's' || e.key === 'S')){ skipQuestion();
+  } else if (!s.answers[id] && (e.key === 'v' || e.key === 'V')){ revealAnswer();
+  } else if (/^[1-9]$/.test(e.key) && !s.answers[id]){
+    const o = s.perm[id][parseInt(e.key, 10) - 1];
+    if (o === undefined) return;
+    if (q.answer.length > 1){ const i = s.pending.indexOf(o); if (i >= 0) s.pending.splice(i, 1); else s.pending.push(o); render(); }
+    else answerQuestion([o]);
+  }
+});
+
+// restore view: an unfinished session stays on the Practice tab with a Resume banner
+render();
+window.__app = {get state(){ return state; }, Logic};
+</script>
+</body>
+</html>
