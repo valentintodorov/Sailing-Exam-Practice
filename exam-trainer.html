@@ -777,6 +777,16 @@ window.addEventListener('storage', e => {
 
 // restore view: an unfinished session stays on the Practice tab with a Resume banner
 render();
+
+// First visit (no questions stored): load the bundled question set that sits next to this page.
+// Fails silently when opened from file:// or when the file is missing; manual import still works.
+const BUNDLED_QUESTIONS = 'vodach-40bt-questions-embedded.json';
+if (!Object.keys(state.questions).length){
+  fetch(BUNDLED_QUESTIONS)
+    .then(r => r.ok ? r.text() : Promise.reject(r.status))
+    .then(text => { if (!Object.keys(state.questions).length) doImport(text); })
+    .catch(() => {});
+}
 window.__app = {get state(){ return state; }, Logic};
 </script>
 </body>

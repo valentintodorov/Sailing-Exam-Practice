@@ -1,0 +1,13 @@
+// Minimal static file server for local testing: node .claude/serve.js
+const http = require('http'), fs = require('fs'), path = require('path');
+const root = path.resolve(__dirname, '..');
+const types = {'.html': 'text/html', '.json': 'application/json', '.js': 'text/javascript', '.css': 'text/css'};
+http.createServer((req, res) => {
+  const p = path.join(root, decodeURIComponent(req.url.split('?')[0]).replace(/\/$/, '/index.html'));
+  if (!p.startsWith(root)) { res.writeHead(403); return res.end(); }
+  fs.readFile(p, (err, data) => {
+    if (err) { res.writeHead(404); return res.end('not found'); }
+    res.writeHead(200, {'Content-Type': types[path.extname(p)] || 'application/octet-stream', 'Cache-Control': 'no-store'});
+    res.end(data);
+  });
+}).listen(8765, () => console.log('serving on http://localhost:8765'));
